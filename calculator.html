@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blue Calculator</title>
+  <style>
+    :root{
+      --bg: #0b1220;          /* page background */
+      --panel: #10243b;       /* calc panel */
+      --panel-2: #0f1b2d;     /* darker panel */
+      --primary: #1e66f5;     /* bright blue */
+      --primary-700: #1a56d6; /* pressed */
+      --accent: #89b4ff;      /* light accents */
+      --text: #e6efff;
+      --muted: #9db7e1;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --shadow: 0 10px 30px rgba(30,102,245,.25);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 10%, #14223a 0%, var(--bg) 60%);
+      color: var(--text);
+      display:grid; place-items:center; padding: 16px;
+    }
+
+    .calc{
+      width:min(100%, 420px);
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .brand{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 18px; font-size:.9rem; color: var(--muted);
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .brand .dot{ width:10px; height:10px; border-radius:50%; background: var(--primary); box-shadow: 0 0 12px rgba(30,102,245,.7);}    
+
+    .display{
+      padding: 18px;
+      display:grid; gap:10px;
+    }
+    .history{
+      min-height: 24px; color: var(--muted); text-align:right; letter-spacing:.5px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .screen{
+      width:100%;
+      background: rgba(15,31,57,.55);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 18px 14px;
+      text-align:right;
+      font-weight:700;
+      font-size: clamp(28px, 7vw, 40px);
+      color: var(--text);
+    }
+
+    .keys{
+      display:grid; gap: 10px; padding: 12px 18px 18px;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    button{
+      appearance:none; border:none; cursor:pointer;
+      font-size: clamp(18px, 4.8vw, 22px);
+      font-weight: 600; color: var(--text);
+      border-radius: 14px; padding: 16px 10px;
+      background: #142742;
+      border: 1px solid rgba(255,255,255,.06);
+      transition: transform .05s ease, filter .15s ease, background .15s ease;
+      min-height: 54px;   /* easier touch target */
+    }
+    button:active{ transform: scale(.98); }
+    button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .op{ background: #183155; }
+    .op[data-op]{ background: linear-gradient(180deg,#183b6b,#173056); }
+    .op.primary{ background: linear-gradient(180deg, var(--primary), var(--primary-700)); box-shadow: 0 8px 20px rgba(30,102,245,.35); }
+    .danger{ background: linear-gradient(180deg, #283042, #1a2030); color:#ffb4b4; }
+    .ok{ color:#c9ffd7; }
+
+    .span-2{ grid-column: span 2; }
+
+    /* Better small-device spacing */
+    @media (max-width: 360px){
+      .brand{ padding: 10px 14px; }
+      .display{ padding: 14px; }
+      .keys{ padding: 10px 14px 16px; gap:8px; }
+      button{ min-height: 50px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="calc" role="application" aria-label="Calculator">
+    <div class="brand">
+      <div>Blue Calculator</div>
+      <div class="dot" aria-hidden="true"></div>
+    </div>
+
+    <section class="display">
+      <div id="history" class="history" aria-live="polite"></div>
+      <output id="screen" class="screen" aria-live="polite">0</output>
+    </section>
+
+    <section class="keys" aria-label="Calculator keys">
+      <button class="danger" data-action="clear" aria-label="All Clear">AC</button>
+      <button class="danger" data-action="del" aria-label="Delete">DEL</button>
+      <button class="op" data-action="percent" aria-label="Percent">%</button>
+      <button class="op" data-op="/" aria-label="Divide">÷</button>
+
+      <button data-digit="7">7</button>
+      <button data-digit="8">8</button>
+      <button data-digit="9">9</button>
+      <button class="op" data-op="*" aria-label="Multiply">×</button>
+
+      <button data-digit="4">4</button>
+      <button data-digit="5">5</button>
+      <button data-digit="6">6</button>
+      <button class="op" data-op="-" aria-label="Subtract">−</button>
+
+      <button data-digit="1">1</button>
+      <button data-digit="2">2</button>
+      <button data-digit="3">3</button>
+      <button class="op" data-op="+" aria-label="Add">+</button>
+
+      <button class="ok" data-action="negate" aria-label="Plus Minus">±</button>
+      <button data-digit="0" class="span-2">0</button>
+      <button data-action="dot">.</button>
+      <button class="op primary" data-action="equals" aria-label="Equals">=</button>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const screen = document.getElementById('screen');
+      const history = document.getElementById('history');
+      const keys = document.querySelector('.keys');
+
+      let expr = '';   // internal expression (JS operators)
+      let justEvaluated = false;
+
+      const isOp = c => ['+','-','*','/'].includes(c);
+
+      function updateScreen(){
+        screen.textContent = prettyExpr(expr) || '0';
+      }
+
+      function prettyExpr(e){
+        return e
+          .replaceAll('*','×')
+          .replaceAll('/','÷');
+      }
+
+      function appendDigit(d){
+        if(justEvaluated){ expr = ''; justEvaluated=false; history.textContent=''; }
+        // prevent leading zeros like 00 unless decimal
+        const last = expr.slice(-1);
+        const lastToken = getLastToken();
+        if(lastToken === '0' && !expr.endsWith('.')){
+          // replace leading 0 if previous char is start or operator
+          const before = expr.slice(0,-1);
+          if(before === '' || isOp(before.slice(-1))){
+            expr = before + d;
+            updateScreen();
+            return;
+          }
+        }
+        expr += d;
+        updateScreen();
+      }
+
+      function appendOp(op){
+        if(expr === '' && op !== '-') return; // don't start with op except minus
+        if(justEvaluated) justEvaluated=false;
+        // replace trailing operator
+        if(isOp(expr.slice(-1))){
+          expr = expr.slice(0,-1) + op;
+        } else if(expr.slice(-1) === '.'){
+          // if last is dot, append 0 then op
+          expr += '0' + op;
+        } else {
+          expr += op;
+        }
+        updateScreen();
+      }
+
+      function addDot(){
+        if(justEvaluated){ expr=''; justEvaluated=false; history.textContent=''; }
+        // prevent multiple dots in the current number token
+        const token = getLastToken();
+        if(token.includes('.')) return;
+        if(expr === '' || isOp(expr.slice(-1))) expr += '0';
+        expr += '.';
+        updateScreen();
+      }
+
+      function getLastToken(){
+        const m = expr.match(/([\d.]+)(?!.*[\d.])/);
+        return m ? m[0] : '';
+      }
+
+      function negate(){
+        if(expr==='') return;
+        // find last number token and toggle sign
+        const re = /(.*?)([+\-*/]?)(\d*\.?\d+)$/.exec(expr);
+        if(!re){ expr = expr.startsWith('-') ? expr.slice(1) : '-' + expr; updateScreen(); return; }
+        let [_, head, op, num] = re; // eslint-disable-line no-unused-vars
+        if(num === '') return;
+        if(op === '-'){
+          // convert a-b to a+(-b) → a+b (since negating the second term)
+          expr = head + '+' + num;
+        } else if(op === '+'){
+          expr = head + '-' + num;
+        } else if(op === '' && head === ''){
+          expr = (num.startsWith('-') ? num.slice(1) : '-' + num);
+        } else {
+          // wrap with parentheses
+          expr = head + op + '(' + (-parseFloat(num)) + ')';
+        }
+        updateScreen();
+      }
+
+      function percent(){
+        // Convert the last number into its percent (divide by 100)
+        const re = /(.*?)(\d*\.?\d+)$/.exec(expr);
+        if(!re) return;
+        const head = re[1];
+        const num = parseFloat(re[2]);
+        if(isNaN(num)) return;
+        const val = num / 100;
+        expr = head + val;
+        updateScreen();
+      }
+
+      function sanitize(str){
+        // allow only digits, ops, dot, parentheses
+        return /^[0-9+\-*/().\s]+$/.test(str);
+      }
+
+      function evaluate(){
+        if(expr==='') return;
+        let e = expr;
+        // trim trailing operator/dot
+        while(e && (isOp(e.slice(-1)) || e.slice(-1) === '.')){
+          e = e.slice(0,-1);
+        }
+        if(!sanitize(e)) return;
+        try{
+          // eslint-disable-next-line no-new-func
+          const result = Function('return (' + e + ')')();
+          if(typeof result === 'number' && isFinite(result)){
+            history.textContent = prettyExpr(expr) + ' =';
+            expr = String(roundSmart(result));
+            justEvaluated = true;
+            updateScreen();
+          }
+        }catch(err){
+          flashError();
+        }
+      }
+
+      function roundSmart(n){
+        // Avoid long floats; keep up to 12 sig digits
+        const s = Number.parseFloat(n.toPrecision(12));
+        return s;
+      }
+
+      function clearAll(){ expr=''; history.textContent=''; justEvaluated=false; updateScreen(); }
+      function del(){ if(justEvaluated){ clearAll(); return; } expr = expr.slice(0,-1); updateScreen(); }
+
+      function flashError(){
+        const el = document.querySelector('.calc');
+        el.animate([
+          { boxShadow: '0 10px 30px rgba(239,68,68,.55)' },
+          { boxShadow: 'var(--shadow)' }
+        ],{ duration: 500, easing: 'ease-out' });
+      }
+
+      // Click handling
+      keys.addEventListener('click', (e)=>{
+        const b = e.target.closest('button');
+        if(!b) return;
+        if(b.dataset.digit) return appendDigit(b.dataset.digit);
+        if(b.dataset.op) return appendOp(b.dataset.op);
+        const act = b.dataset.action;
+        if(act === 'dot') return addDot();
+        if(act === 'equals') return evaluate();
+        if(act === 'clear') return clearAll();
+        if(act === 'del') return del();
+        if(act === 'negate') return negate();
+        if(act === 'percent') return percent();
+      });
+
+      // Keyboard support
+      window.addEventListener('keydown', (e)=>{
+        const k = e.key;
+        if(/[0-9]/.test(k)) return appendDigit(k);
+        if(['+','-','*','/'].includes(k)) return appendOp(k);
+        if(k === '.') return addDot();
+        if(k === 'Enter' || k === '='){ e.preventDefault(); return evaluate(); }
+        if(k === 'Backspace') return del();
+        if(k === 'Escape') return clearAll();
+        if(k === '%') return percent();
+      });
+
+      updateScreen();
+    })();
+  </script>
+</body>
+</html>
